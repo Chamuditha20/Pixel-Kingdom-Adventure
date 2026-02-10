@@ -101,34 +101,31 @@ window.addEventListener('load', function() {
         [2,2,0,0,2,2,0,0,2,2,0]
     ];
 
-    // Mushrooms (12x12 approx)
+    // Green Orc/Goblin with Helmet
     const ENEMY_WALK = [
-        [0,0,0,0,2,2,2,2,0,0,0,0],
-        [0,0,0,2,2,2,2,2,2,0,0,0],
-        [0,0,2,2,2,2,2,2,2,2,0,0],
-        [0,2,2,2,2,2,2,2,2,2,2,0],
-        [2,2,2,1,1,2,2,1,1,2,2,2], // Eyes (1=white/black mix handled in logic ideally, but simplified)
-        [2,2,2,1,1,2,2,1,1,2,2,2],
-        [2,2,2,2,2,2,2,2,2,2,2,2],
-        [0,2,2,2,2,2,2,2,2,2,2,0],
-        [0,0,2,2,2,2,2,2,2,2,0,0],
-        [0,0,0,0,1,1,1,1,0,0,0,0], // Stem
-        [0,0,0,1,1,1,1,1,1,0,0,0], // Feet
-        [0,0,1,1,0,0,0,0,1,1,0,0]
+        [0,0,0,4,0,0,0,0,4,0,0,0], // Horns
+        [0,0,2,2,2,2,2,2,2,2,0,0], // Helmet Top
+        [0,2,2,3,3,2,2,3,3,2,2,0], // Helmet/Eyes(3)
+        [0,1,1,3,3,1,1,3,3,1,1,0], // Face(1) / Eyes(3)
+        [0,1,1,1,1,1,1,1,1,1,1,0], // Nose/Cheeks
+        [0,0,1,4,1,1,1,1,4,1,0,0], // Teeth(4)
+        [0,0,2,2,2,2,2,2,2,2,0,0], // Armor/Collar
+        [0,1,2,2,2,2,2,2,2,2,1,0], // Body/Arms(1)
+        [0,1,2,5,2,2,2,2,5,2,1,0], // Belt(5)
+        [0,0,2,2,2,0,0,2,2,2,0,0], // Legs
+        [0,0,2,2,0,0,0,0,2,2,0,0], // Feet
+        [0,2,2,2,0,0,0,0,2,2,2,0]
     ];
 
     function drawSprite(ctx, map, x, y, size, colors, flip = false) {
         const rows = map.length;
-        // Be robust: check if map has content
         if (rows === 0) return;
         const cols = map[0].length;
          for (let row = 0; row < rows; row++) {
-            // Be robust: row length check if inconsistent
             const rData = map[row];
             if (!rData) continue;
             
             for (let col = 0; col < cols; col++) {
-                // Bounds check
                 if (col >= rData.length) continue;
 
                 const pixel = rData[col];
@@ -429,10 +426,13 @@ window.addEventListener('load', function() {
         }
 
         draw(context) {
-            // Colors: 1=Black/White, 2=Brown
+            // Colors: 1=Green Skin, 2=Grey Armor, 3=Black/Shadow, 4=Horns/Teeth(White), 5=Belt(Red/Brown)
             const colors = {
-                1: '#000000', // Feet/Eyes
-                2: '#8B4513'  // Body
+                1: '#4CAF50', // Green Skin
+                2: '#808080', // Grey Armor
+                3: '#000000', // Eyes/Dark
+                4: '#F5F5DC', // Beige/Horn
+                5: '#8B0000'  // Dark Red belt
             };
             drawSprite(context, ENEMY_WALK, this.x, this.y, SPRITE_SCALE, colors, false);
         }
@@ -544,6 +544,15 @@ window.addEventListener('load', function() {
     const input = new InputHandler();
     let player = new Player(canvas.width, canvas.height); 
 
+    function updateLivesDisplay() {
+        const livesContainer = document.getElementById('lives');
+        let hearts = '';
+        for(let i=0; i<lives; i++) {
+            hearts += '❤️';
+        }
+        livesContainer.innerText = 'Lives: ' + hearts;
+    }
+
     function handleEnemies(deltaTime) {
         enemies.forEach(enemy => {
             enemy.update();
@@ -565,7 +574,7 @@ window.addEventListener('load', function() {
                 } else {
                     lives--;
                     playSound('hit');
-                    document.getElementById('lives').innerText = 'Lives: ' + lives;
+                    updateLivesDisplay();
                     player.x = 100; player.y = canvas.height - 150;
                     
                     if (lives <= 0) {
@@ -651,7 +660,7 @@ window.addEventListener('load', function() {
         if (player.y > canvas.height) {
             lives--;
             playSound('hit');
-            document.getElementById('lives').innerText = 'Lives: ' + lives;
+            updateLivesDisplay();
             player.x = 100; player.y = canvas.height - 150;
             player.vy = 0;
             if (lives <= 0) {
@@ -674,13 +683,14 @@ window.addEventListener('load', function() {
         score = 0;
         lives = 3;
         document.getElementById('score').innerText = 'Score: 0';
-        document.getElementById('lives').innerText = 'Lives: 3';
+        updateLivesDisplay();
         document.getElementById('game-over').classList.add('hidden');
         player = new Player(canvas.width, canvas.height);
         createLevel(); 
         lastTime = performance.now();
         animate(lastTime);
     }
-
+    
+    updateLivesDisplay(); // Init
     animate(0);
 });
