@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #202028;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: 'Press Start 2P', cursive;
+    overflow: hidden;
+    color: white;
+}
+
+#game-container {
+    position: relative;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    border: 4px solid #4a4a5a;
+    border-radius: 4px;
+}
+
+canvas {
+    display: block;
+    background-color: #87CEEB; /* Sky blue background */
+    image-rendering: pixelated; /* Keeps pixel art crisp */
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Let clicks pass through to canvas if needed */
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+#score, #lives {
+    font-size: 16px;
+    text-shadow: 2px 2px 0 #000;
+}
+
+#lives {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+}
+
+#instructions {
+    position: absolute;
+    bottom: 10px;
+    width: 100%;
+    text-align: center;
+    font-size: 10px;
+    opacity: 0.7;
+    text-shadow: 1px 1px 0 #000;
+}
+
+#game-over {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 40px;
+    border: 4px solid white;
+    border-radius: 8px;
+    z-index: 10;
+}
+
+.hidden {
+    display: none !important;
+}
+
+#game-over h1 {
+    color: #ff4444;
+    margin-bottom: 20px;
+    font-size: 32px;
+    text-transform: uppercase;
+}
+
+#game-over p {
+    font-size: 14px;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
