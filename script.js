@@ -61,27 +61,47 @@ window.addEventListener('load', function() {
     // 0 = transparent, 1 = main color, 2 = secondary color, 3 = skin/details
     const SPRITE_SCALE = 4; // Each "pixel" in the map is 4x4 on screen
     
-    // Mario-ish Idle (12x16 grid approx)
+    // Custom Character (Beard, Blue Shirt, Jeans) - IDLE
     const PLAYER_IDLE = [
-        [0,0,0,1,1,1,1,1,0,0,0,0], // Hat
-        [0,0,1,1,1,1,1,1,1,1,1,0],
-        [0,0,3,3,3,2,2,3,2,0,0,0], // Face
-        [0,3,2,3,3,3,2,3,3,3,0,0],
-        [0,3,3,3,3,2,2,2,2,3,0,0],
-        [0,0,3,3,3,3,3,3,3,0,0,0],
-        [0,0,0,1,2,1,1,2,1,0,0,0], // Body/Overalls
-        [0,0,1,1,2,1,1,2,1,1,0,0],
-        [0,1,1,1,2,2,2,2,1,1,1,0],
-        [1,1,1,1,2,2,2,2,1,1,1,1],
-        [3,3,1,2,4,2,2,4,2,1,3,3], // Hands/Buttons(4)
-        [3,3,3,2,2,2,2,2,2,3,3,3],
-        [0,0,2,2,2,0,0,2,2,2,0,0],
-        [0,2,2,2,0,0,0,0,2,2,2,0], // Legs
-        [1,1,1,0,0,0,0,0,0,1,1,1], // Shoes
-        [1,1,1,1,0,0,0,0,1,1,1,1]
+        [0,0,2,2,2,2,2,2,2,0,0,0], // Hair (Bushy)
+        [0,2,2,2,2,2,2,2,2,2,0,0],
+        [0,2,2,3,3,3,3,3,2,2,0,0], // Forehead/Hair sides
+        [0,2,3,3,2,3,2,3,3,2,0,0], // Eyes (2=dark)
+        [0,2,3,3,3,3,3,3,3,2,0,0],
+        [0,0,3,2,2,2,2,2,3,0,0,0], // Beard
+        [0,0,0,4,4,1,4,4,0,0,0,0], // Collar(4) / Shirt(1)
+        [0,0,1,1,1,5,1,1,1,0,0,0], // Shirt / Logo(5)
+        [0,4,1,1,1,1,1,1,1,4,0,0], // Sleeves(4)
+        [4,4,3,1,1,1,1,1,3,4,4],   // Hands(3/Gloves4)
+        [0,0,1,6,6,5,6,6,1,0,0],   // Belt(6) Buckle(5)
+        [0,0,1,1,1,1,1,1,1,0,0],   // Pants
+        [0,0,1,1,0,0,0,1,1,0,0],
+        [0,1,1,1,0,0,0,1,1,1,0],
+        [0,2,2,2,0,0,0,2,2,2,0], // Boots
+        [2,2,2,2,0,0,0,2,2,2,2]
     ];
 
-    // Goomba-ish (12x12 approx)
+    // Custom Character - RUN (Corrected dimensions: 12x16)
+    const PLAYER_RUN = [
+        [0,0,2,2,2,2,2,2,2,0,0,0], 
+        [0,2,2,2,2,2,2,2,2,2,0,0],
+        [0,2,2,3,3,3,3,3,2,2,0,0], 
+        [0,2,3,3,2,3,2,3,3,2,0,0], 
+        [0,2,3,3,3,3,3,3,3,2,0,0],
+        [0,0,3,2,2,2,2,2,3,0,0,0], 
+        [0,0,0,4,4,1,4,4,0,0,0,0], 
+        [0,0,1,1,1,5,1,1,1,0,0,0], 
+        [0,4,1,1,1,1,1,1,1,4,0,0], 
+        [4,4,3,1,1,1,1,1,3,4,4],   
+        [0,0,1,6,6,5,6,6,1,0,0],   
+        [0,0,1,1,1,1,1,1,1,0,0],   
+        [0,0,1,1,0,0,0,1,1,0,0],
+        [0,1,0,0,1,1,0,0,1,1,0],   // Running Legs (extended stride)
+        [1,1,0,0,2,2,0,0,2,2,0],   // Feet moved
+        [2,2,0,0,2,2,0,0,2,2,0]
+    ];
+
+    // Mushrooms (12x12 approx)
     const ENEMY_WALK = [
         [0,0,0,0,2,2,2,2,0,0,0,0],
         [0,0,0,2,2,2,2,2,2,0,0,0],
@@ -99,11 +119,20 @@ window.addEventListener('load', function() {
 
     function drawSprite(ctx, map, x, y, size, colors, flip = false) {
         const rows = map.length;
+        // Be robust: check if map has content
+        if (rows === 0) return;
         const cols = map[0].length;
          for (let row = 0; row < rows; row++) {
+            // Be robust: row length check if inconsistent
+            const rData = map[row];
+            if (!rData) continue;
+            
             for (let col = 0; col < cols; col++) {
-                const pixel = map[row][col];
-                if (pixel > 0) {
+                // Bounds check
+                if (col >= rData.length) continue;
+
+                const pixel = rData[col];
+                if (pixel > 0 && colors[pixel]) {
                     ctx.fillStyle = colors[pixel];
                     // Flip horizontally if needed
                     const drawX = flip ? x + (cols - 1 - col) * size : x + col * size;
@@ -277,18 +306,44 @@ window.addEventListener('load', function() {
             this.jumpPower = 20; 
             this.maxSpeed = 7;
             this.direction = 1; // 1 Right, -1 Left
+            
+            // Animation
+            this.frameTimer = 0;
+            this.frameInterval = 10; // Frames to switch sprite
+            this.frameX = 0; // 0 = idle, 1 = run
         }
 
         draw(context) {
             // Pixel Art Player
-            // Colors: 1=Red, 2=Blue, 3=Skin, 4=Yellow
+            // Updated Colors based on User Request
             const colors = {
-                1: '#FF0000',
-                2: '#0000FF',
-                3: '#FFCC99',
-                4: '#FFFF00'
+                1: '#1a53ff', // Blue
+                2: '#2c1a0e', // Dark Brown/Black
+                3: '#eabb99', // Skin
+                4: '#ffffff', // White
+                5: '#FFD700', // Yellow
+                6: '#8B4513'  // Brown belt
             };
-            drawSprite(context, PLAYER_IDLE, this.x, this.y, SPRITE_SCALE, colors, this.direction === -1);
+            
+            let sprite = PLAYER_IDLE;
+            
+            // Simple animation
+            if (this.speed !== 0) {
+                this.frameTimer++;
+                if (this.frameTimer > this.frameInterval) {
+                   this.frameX = (this.frameX === 0) ? 1 : 0;
+                   this.frameTimer = 0;
+                }
+                
+                if (this.frameX === 1) sprite = PLAYER_RUN;
+                else sprite = PLAYER_IDLE;
+                
+            } else {
+                sprite = PLAYER_IDLE;
+                this.frameX = 0;
+            }
+
+            drawSprite(context, sprite, this.x, this.y, SPRITE_SCALE, colors, this.direction === -1);
         }
 
         update(input, platforms) {
