@@ -111,6 +111,7 @@ window.addEventListener('load', function() {
             // Vertical Movement (Jumping)
             if ((input.keys.includes('ArrowUp') || input.keys.includes('w') || input.keys.includes(' ')) && this.onGround(platforms)) {
                 this.vy -= this.jumpPower;
+                playSound('jump');
             }
 
             // Apply Gravity
@@ -216,6 +217,7 @@ window.addEventListener('load', function() {
     let platforms = [];
     let enemies = [];
     let coins = [];
+    let victoryRect = {};
     let lives = 3;
     
     function createLevel() {
@@ -224,7 +226,7 @@ window.addEventListener('load', function() {
         coins = [];
         
         // Ground floor (series of blocks or one long block)
-        platforms.push(new Platform(0, canvas.height - 50, 2000, 50)); 
+        platforms.push(new Platform(0, canvas.height - 50, 2500, 50)); 
         
         // Random Platforms & Entities
         const platformData = [
@@ -232,7 +234,9 @@ window.addEventListener('load', function() {
             {x: 600, y: 250, w: 200},
             {x: 900, y: 350, w: 200},
             {x: 1200, y: 200, w: 150},
-            {x: 1500, y: 300, w: 200}
+            {x: 1500, y: 300, w: 200},
+            {x: 1800, y: 250, w: 200},
+            {x: 2100, y: 350, w: 200}
         ];
 
         platformData.forEach(p => {
@@ -258,6 +262,9 @@ window.addEventListener('load', function() {
         enemies.push(new Enemy(500, canvas.height - 90));
         enemies[enemies.length-1].minX = 400;
         enemies[enemies.length-1].maxX = 700;
+
+        // Victory Condition (Flag pole at end)
+        victoryRect = {x: 2400, y: canvas.height - 150, w: 20, h: 100};
     }
 
     // Update Enemy Class with Patrol Logic
@@ -301,10 +308,12 @@ window.addEventListener('load', function() {
                     enemy.markedForDeletion = true;
                     player.vy = -15; // Bounce
                     score += 20;
+                    playSound('hit');
                     document.getElementById('score').innerText = 'Score: ' + score;
                 } else {
                     // Player hit from side/bottom (Ouch)
                     lives--;
+                    playSound('hit');
                     document.getElementById('lives').innerText = 'Lives: ' + lives;
                     player.x = 100; // Reset position
                     player.y = canvas.height - 150;
@@ -312,6 +321,8 @@ window.addEventListener('load', function() {
                     
                     if (lives <= 0) {
                         gameOver = true;
+                        playSound('gameover');
+                        document.getElementById('game-over').querySelector('h1').innerText = "GAME OVER";
                         document.getElementById('game-over').classList.remove('hidden');
                     }
                 }
@@ -332,6 +343,7 @@ window.addEventListener('load', function() {
             ) {
                 coin.markedForDeletion = true;
                 score += 10;
+                playSound('coin');
                 document.getElementById('score').innerText = 'Score: ' + score;
             }
         });
@@ -361,6 +373,12 @@ window.addEventListener('load', function() {
         // Draw Platforms
         platforms.forEach(platform => platform.draw(ctx));
 
+        // Draw Victory Goal
+        ctx.fillStyle = 'gold';
+        ctx.fillRect(victoryRect.x, victoryRect.y, victoryRect.w, victoryRect.h);
+        ctx.fillStyle = 'red';
+        ctx.fillRect(victoryRect.x + 10, victoryRect.y, 40, 30); // Flag
+
         // Handle Entities
         handleEnemies(deltaTime);
         handleCoins();
@@ -369,14 +387,25 @@ window.addEventListener('load', function() {
         player.draw(ctx);
         player.update(input, platforms); 
 
+        // Check Victory
+        if (player.x + player.width > victoryRect.x) {
+            gameOver = true;
+            playSound('coin');
+            document.getElementById('game-over').querySelector('h1').innerText = "YOU WIN!";
+            document.getElementById('game-over').classList.remove('hidden');
+        }
+
         // Check if fell off world
         if (player.y > canvas.height) {
             lives--;
+            playSound('hit');
             document.getElementById('lives').innerText = 'Lives: ' + lives;
             player.x = 100; player.y = canvas.height - 150;
             player.vy = 0;
             if (lives <= 0) {
                 gameOver = true;
+                playSound('gameover');
+                document.getElementById('game-over').querySelector('h1').innerText = "GAME OVER";
                 document.getElementById('game-over').classList.remove('hidden');
             } else {
                 // If we fell, we probably need to reset camera too, but camera follows player so safe.
