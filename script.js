@@ -10,6 +10,13 @@ window.addEventListener('load', function() {
     let lastTime = 0;
     let score = 0;
     let gameOver = false;
+    let gameWon = false;
+    let lives = 3;
+
+    // Power-up State
+    let isInvcible = false;
+    let speedBoost = false;
+    let powerUpTimer = 0;
 
     // Sound Effects
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -46,6 +53,14 @@ window.addEventListener('load', function() {
             gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
             osc.start();
             osc.stop(now + 0.2);
+        } else if (type === 'powerup') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.linearRampToValueAtTime(800, now + 0.5);
+            gainNode.gain.setValueAtTime(0.05, now);
+            gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+            osc.start();
+            osc.stop(now + 0.5);
         } else if (type === 'gameover') {
              osc.type = 'triangle';
             osc.frequency.setValueAtTime(300, now);
@@ -58,30 +73,28 @@ window.addEventListener('load', function() {
     }
 
     // --- SPRITE DATA (Pixel Art) ---
-    // 0 = transparent, 1 = main color, 2 = secondary color, 3 = skin/details
-    const SPRITE_SCALE = 4; // Each "pixel" in the map is 4x4 on screen
+    const SPRITE_SCALE = 4; 
     
     // Custom Character (Beard, Blue Shirt, Jeans) - IDLE
     const PLAYER_IDLE = [
-        [0,0,2,2,2,2,2,2,2,0,0,0], // Hair (Bushy)
+        [0,0,2,2,2,2,2,2,2,0,0,0], 
         [0,2,2,2,2,2,2,2,2,2,0,0],
-        [0,2,2,3,3,3,3,3,2,2,0,0], // Forehead/Hair sides
-        [0,2,3,3,2,3,2,3,3,2,0,0], // Eyes (2=dark)
+        [0,2,2,3,3,3,3,3,2,2,0,0], 
+        [0,2,3,3,2,3,2,3,3,2,0,0], 
         [0,2,3,3,3,3,3,3,3,2,0,0],
-        [0,0,3,2,2,2,2,2,3,0,0,0], // Beard
-        [0,0,0,4,4,1,4,4,0,0,0,0], // Collar(4) / Shirt(1)
-        [0,0,1,1,1,5,1,1,1,0,0,0], // Shirt / Logo(5)
-        [0,4,1,1,1,1,1,1,1,4,0,0], // Sleeves(4)
-        [4,4,3,1,1,1,1,1,3,4,4],   // Hands(3/Gloves4)
-        [0,0,1,6,6,5,6,6,1,0,0],   // Belt(6) Buckle(5)
-        [0,0,1,1,1,1,1,1,1,0,0],   // Pants
+        [0,0,3,2,2,2,2,2,3,0,0,0], 
+        [0,0,0,4,4,1,4,4,0,0,0,0], 
+        [0,0,1,1,1,5,1,1,1,0,0,0], 
+        [0,4,1,1,1,1,1,1,1,4,0,0], 
+        [4,4,3,1,1,1,1,1,3,4,4],   
+        [0,0,1,6,6,5,6,6,1,0,0],   
+        [0,0,1,1,1,1,1,1,1,0,0],   
         [0,0,1,1,0,0,0,1,1,0,0],
         [0,1,1,1,0,0,0,1,1,1,0],
-        [0,2,2,2,0,0,0,2,2,2,0], // Boots
+        [0,2,2,2,0,0,0,2,2,2,0], 
         [2,2,2,2,0,0,0,2,2,2,2]
     ];
 
-    // Custom Character - RUN (Corrected dimensions: 12x16)
     const PLAYER_RUN = [
         [0,0,2,2,2,2,2,2,2,0,0,0], 
         [0,2,2,2,2,2,2,2,2,2,0,0],
@@ -96,42 +109,71 @@ window.addEventListener('load', function() {
         [0,0,1,6,6,5,6,6,1,0,0],   
         [0,0,1,1,1,1,1,1,1,0,0],   
         [0,0,1,1,0,0,0,1,1,0,0],
-        [0,1,0,0,1,1,0,0,1,1,0],   // Running Legs (extended stride)
-        [1,1,0,0,2,2,0,0,2,2,0],   // Feet moved
+        [0,1,0,0,1,1,0,0,1,1,0],   
+        [1,1,0,0,2,2,0,0,2,2,0],   
         [2,2,0,0,2,2,0,0,2,2,0]
     ];
 
-    // Green Orc/Goblin with Helmet
-    const ENEMY_WALK = [
-        [0,0,0,4,0,0,0,0,4,0,0,0], // Horns
-        [0,0,2,2,2,2,2,2,2,2,0,0], // Helmet Top
-        [0,2,2,3,3,2,2,3,3,2,2,0], // Helmet/Eyes(3)
-        [0,1,1,3,3,1,1,3,3,1,1,0], // Face(1) / Eyes(3)
-        [0,1,1,1,1,1,1,1,1,1,1,0], // Nose/Cheeks
-        [0,0,1,4,1,1,1,1,4,1,0,0], // Teeth(4)
-        [0,0,2,2,2,2,2,2,2,2,0,0], // Armor/Collar
-        [0,1,2,2,2,2,2,2,2,2,1,0], // Body/Arms(1)
-        [0,1,2,5,2,2,2,2,5,2,1,0], // Belt(5)
-        [0,0,2,2,2,0,0,2,2,2,0,0], // Legs
-        [0,0,2,2,0,0,0,0,2,2,0,0], // Feet
+    // Green Orc
+    const ENEMY_ORC = [
+        [0,0,0,4,0,0,0,0,4,0,0,0], 
+        [0,0,2,2,2,2,2,2,2,2,0,0], 
+        [0,2,2,3,3,2,2,3,3,2,2,0], 
+        [0,1,1,3,3,1,1,3,3,1,1,0], 
+        [0,1,1,1,1,1,1,1,1,1,1,0], 
+        [0,0,1,4,1,1,1,1,4,1,0,0], 
+        [0,0,2,2,2,2,2,2,2,2,0,0], 
+        [0,1,2,2,2,2,2,2,2,2,1,0], 
+        [0,1,2,5,2,2,2,2,5,2,1,0], 
+        [0,0,2,2,2,0,0,2,2,2,0,0], 
+        [0,0,2,2,0,0,0,0,2,2,0,0], 
         [0,2,2,2,0,0,0,0,2,2,2,0]
     ];
 
+    // Snail (New)
+    const ENEMY_SNAIL = [
+        [0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,2,0,0,0,2,0], // Eyes
+        [0,0,0,0,0,0,2,0,0,0,2,0],
+        [0,0,0,1,1,1,1,3,3,3,3,0], // Shell (1) Head (3)
+        [0,0,1,1,1,1,1,3,3,3,3,0],
+        [0,0,1,1,4,4,1,3,3,3,3,0], // Spiral(4)
+        [0,0,1,1,1,1,1,3,3,3,3,0],
+        [0,0,0,1,1,1,1,3,3,3,3,0],
+        [0,0,0,0,3,3,3,3,3,3,3,0], // Body
+        [0,0,0,3,3,3,3,3,3,3,3,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0]
+    ];
+
+    // Plant (Static Hazard)
+    const ENEMY_PLANT = [
+        [0,0,0,0,1,1,1,1,0,0,0,0], // Mouth
+        [0,0,0,1,4,1,1,4,1,0,0,0], // Teeth(4)
+        [0,0,1,1,1,1,1,1,1,1,0,0], // Head
+        [0,0,1,1,4,1,1,4,1,1,0,0], 
+        [0,0,0,1,1,1,1,1,1,0,0,0],
+        [0,0,0,0,2,2,2,2,0,0,0,0], // Stem(2)
+        [0,0,2,2,2,2,2,2,2,2,0,0], // Leaves
+        [0,2,2,2,2,2,2,2,2,2,2,0],
+        [0,0,0,0,2,2,2,2,0,0,0,0],
+        [0,0,0,0,2,2,2,2,0,0,0,0],
+        [3,3,3,3,3,3,3,3,3,3,3,3], // Pot/Pipe(3)
+        [3,3,3,3,3,3,3,3,3,3,3,3]
+    ];
+
     function drawSprite(ctx, map, x, y, size, colors, flip = false) {
+        if (!map || map.length === 0) return;
         const rows = map.length;
-        if (rows === 0) return;
         const cols = map[0].length;
          for (let row = 0; row < rows; row++) {
             const rData = map[row];
             if (!rData) continue;
-            
             for (let col = 0; col < cols; col++) {
                 if (col >= rData.length) continue;
-
                 const pixel = rData[col];
                 if (pixel > 0 && colors[pixel]) {
                     ctx.fillStyle = colors[pixel];
-                    // Flip horizontally if needed
                     const drawX = flip ? x + (cols - 1 - col) * size : x + col * size;
                     ctx.fillRect(drawX, y + row * size, size, size);
                 }
@@ -143,33 +185,18 @@ window.addEventListener('load', function() {
         constructor() {
             this.keys = [];
             window.addEventListener('keydown', e => {
-                if ((e.key === 'ArrowDown' || 
-                     e.key === 'ArrowUp' || 
-                     e.key === 'ArrowLeft' || 
-                     e.key === 'ArrowRight' || 
-                     e.key === ' ' || // Space
-                     e.key === 'w' ||
-                     e.key === 'a' ||
-                     e.key === 's' ||
-                     e.key === 'd'
-                    ) && this.keys.indexOf(e.key) === -1) {
+                if ((e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
+                     e.key === ' ' || e.key === 'w' || e.key === 'a' || e.key === 's' || e.key === 'd') 
+                     && this.keys.indexOf(e.key) === -1) {
                     this.keys.push(e.key);
                 }
-                // Restart key
                 if (e.key === 'r' || e.key === 'R') {
-                    if (gameOver) restartGame();
+                    if (gameOver || gameWon) restartGame();
                 }
             });
             window.addEventListener('keyup', e => {
-                 if (e.key === 'ArrowDown' || 
-                     e.key === 'ArrowUp' || 
-                     e.key === 'ArrowLeft' || 
-                     e.key === 'ArrowRight' || 
-                     e.key === ' ' ||
-                     e.key === 'w' ||
-                     e.key === 'a' ||
-                     e.key === 's' ||
-                     e.key === 'd') {
+                 if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
+                     e.key === ' ' || e.key === 'w' || e.key === 'a' || e.key === 's' || e.key === 'd') {
                     this.keys.splice(this.keys.indexOf(e.key), 1);
                 }
             });
@@ -177,7 +204,7 @@ window.addEventListener('load', function() {
     }
 
     class Platform {
-        constructor(x, y, width, height, type = 'grass') {
+        constructor(x, y, width, height, type = 'jungle') {
             this.x = x;
             this.y = y;
             this.width = width;
@@ -186,7 +213,6 @@ window.addEventListener('load', function() {
         }
 
         draw(context) {
-            // Draw Ground Pattern
             const blockSize = 40;
             const cols = Math.ceil(this.width / blockSize);
             const rows = Math.ceil(this.height / blockSize);
@@ -195,41 +221,39 @@ window.addEventListener('load', function() {
                 for (let c = 0; c < cols; c++) {
                     const bx = this.x + c * blockSize;
                     const by = this.y + r * blockSize;
-                    
-                    // Don't draw outside width
                     if (bx + blockSize > this.x + this.width) continue; 
 
-                    if (this.type === 'grass') {
-                        // Top Layer Grass
+                    if (this.type === 'jungle') {
+                        // Mossy/Jungle Ground
                         if (r === 0) {
-                            context.fillStyle = '#FFB347'; // Base dirt
+                            context.fillStyle = '#2E8B57'; // SeaGreen (Mossy top)
                             context.fillRect(bx, by, blockSize, blockSize);
                             // Highlight
-                            context.fillStyle = '#FFDAB9'; 
-                            context.fillRect(bx+5, by+5, 5, 5);
-
-                            // Grass Top
-                            context.fillStyle = '#32CD32'; // Green
-                            context.fillRect(bx, by, blockSize, 10);
-                            context.fillStyle = '#228B22'; // Dark Green border
-                            context.fillRect(bx, by+10, blockSize, 4);
+                            context.fillStyle = '#3CB371'; 
+                            context.fillRect(bx+5, by+5, 15, 5);
+                            // Grass Hanging
+                            context.fillStyle = '#006400'; // DarkGreen
+                            context.fillRect(bx, by+blockSize-5, blockSize, 5);
                         } else {
-                            // Deep Dirt
-                            context.fillStyle = '#8B4513';
+                            // Muddy Jungle Earth
+                            context.fillStyle = '#5D4037'; // Dark Brown
                             context.fillRect(bx, by, blockSize, blockSize);
-                            // Detail pebbles
-                             context.fillStyle = '#654321';
-                             context.fillRect(bx + 10, by + 10, 8, 5);
-                             context.fillRect(bx + 25, by + 25, 6, 6);
+                            // Roots/Rocks
+                             context.fillStyle = '#3E2723';
+                             context.fillRect(bx + 10, by + 10, 8, 20);
+                             context.fillRect(bx + 25, by + 5, 6, 6);
                         }
-                    } else if(this.type === 'brick') {
-                        context.fillStyle = '#B22222';
+                    } else if(this.type === 'stone') {
+                        // Temple Stone
+                        context.fillStyle = '#78909C'; // Blue-Grey
                         context.fillRect(bx, by, blockSize, blockSize);
-                        context.fillStyle = 'black'; // mortar
+                        context.strokeStyle = '#455A64';
                         context.strokeRect(bx, by, blockSize, blockSize);
-                        context.fillRect(bx, by+blockSize/2, blockSize, 2);
-                        context.fillRect(bx+blockSize/2, by, 2, blockSize/2);
-                        context.fillRect(bx+blockSize/4, by+blockSize/2, 2, blockSize/2);
+                        // Moss on stone
+                        if (Math.random() > 0.7) {
+                             context.fillStyle = '#2E8B57';
+                             context.fillRect(bx, by, 10, 10);
+                        }
                     }
                 }
             }
@@ -241,200 +265,144 @@ window.addEventListener('load', function() {
             this.x = x;
             this.y = y;
             this.type = type;
+            this.animationTimer = 0;
         }
         draw(ctx) {
             if (this.type === 'cloud') {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, 30, 0, Math.PI * 2);
-                ctx.arc(this.x + 40, this.y - 10, 40, 0, Math.PI * 2);
-                ctx.arc(this.x + 80, this.y, 30, 0, Math.PI * 2);
+                ctx.arc(this.x, this.y, 40, 0, Math.PI * 2);
+                ctx.arc(this.x + 50, this.y - 15, 50, 0, Math.PI * 2);
+                ctx.arc(this.x + 100, this.y, 40, 0, Math.PI * 2);
                 ctx.fill();
             } else if (this.type === 'bush') {
+                ctx.fillStyle = '#006400';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 25, 0, Math.PI * 2);
+                ctx.arc(this.x + 35, this.y - 15, 30, 0, Math.PI * 2);
+                ctx.arc(this.x + 70, this.y, 25, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (this.type === 'ruins') {
+                 // Jungle Temple Background
+                 ctx.fillStyle = '#546E7A';
+                 ctx.fillRect(this.x, this.y, 150, 200);
+                 ctx.fillStyle = '#455A64'; // Door
+                 ctx.fillRect(this.x + 50, this.y + 120, 50, 80);
+                 // Vines on ruins
+                 ctx.fillStyle = '#2E8B57';
+                 ctx.fillRect(this.x + 10, this.y, 5, 80);
+                 ctx.fillRect(this.x + 130, this.y + 20, 5, 100);
+            } else if (this.type === 'tree') {
+                // Jungle Tree
+                ctx.fillStyle = '#4E342E'; // Trunk
+                ctx.fillRect(this.x + 30, this.y - 100, 40, 100);
+                // Canopy
                 ctx.fillStyle = '#228B22';
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, 20, 0, Math.PI * 2);
-                ctx.arc(this.x + 30, this.y - 10, 25, 0, Math.PI * 2);
-                ctx.arc(this.x + 60, this.y, 20, 0, Math.PI * 2);
+                ctx.arc(this.x + 50, this.y - 120, 60, 0, Math.PI*2);
+                ctx.arc(this.x + 20, this.y - 100, 50, 0, Math.PI*2);
+                ctx.arc(this.x + 80, this.y - 100, 50, 0, Math.PI*2);
                 ctx.fill();
-            } else if (this.type === 'hill') {
-                 ctx.fillStyle = '#3CB371';
-                 ctx.beginPath();
-                 ctx.moveTo(this.x, this.y);
-                 ctx.quadraticCurveTo(this.x + 100, this.y - 150, this.x + 200, this.y);
-                 ctx.fill();
-                 // Border
-                 ctx.strokeStyle = '#006400';
-                 ctx.lineWidth = 4;
-                 ctx.stroke();
-            } else if (this.type === 'pipe') {
-                // Classic Green Pipe
-                const w = 60, h = 80;
-                // Stem
-                ctx.fillStyle = '#00A800'; // Main green
-                ctx.fillRect(this.x + 4, this.y, w - 8, h);
-                ctx.fillStyle = '#006400'; // Dark shade
-                ctx.fillRect(this.x + 10, this.y, 5, h);
-                ctx.fillRect(this.x + w - 15, this.y, 5, h); // Highlight
-                ctx.fillStyle = '#8FBC8F';
-                ctx.fillRect(this.x + 8, this.y, 4, h); 
+            } else if (this.type === 'waterfall') {
+                this.animationTimer++;
+                const flowOffset = (this.animationTimer % 20) * 2;
                 
-                // Head
-                ctx.fillStyle = '#00A800';
-                ctx.fillRect(this.x, this.y, w, 30);
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x, this.y, w, 30);
+                ctx.fillStyle = '#4FC3F7'; // Water Blue
+                ctx.fillRect(this.x, this.y, 60, 300);
+                
+                // Foam/Flow
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                for(let i=0; i<5; i++) {
+                     ctx.fillRect(this.x + i*10 + 5, this.y + flowOffset + (i*50) % 300, 5, 20);
+                }
+                // Splash at bottom
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(this.x + 30, this.y + 300, 30 + Math.sin(this.animationTimer*0.2)*5, 0, Math.PI, false);
+                ctx.fill();
             }
         }
     }
 
-    class Player {
-        constructor(gameWidth, gameHeight) {
-            this.gameWidth = gameWidth;
-            this.gameHeight = gameHeight;
-            this.width = 44; // 11 * 4
-            this.height = 64; // 16 * 4
-            this.x = 100;
-            this.y = this.gameHeight - this.height - 100;
-            this.speed = 0;
-            this.vy = 0;
-            this.weight = 1; 
-            this.jumpPower = 20; 
-            this.maxSpeed = 7;
-            this.direction = 1; // 1 Right, -1 Left
-            
-            // Animation
-            this.frameTimer = 0;
-            this.frameInterval = 10; // Frames to switch sprite
-            this.frameX = 0; // 0 = idle, 1 = run
+    class PowerUp {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.width = 32;
+            this.height = 32;
+            this.markedForDeletion = false;
+            this.angle = 0;
         }
-
-        draw(context) {
-            // Pixel Art Player
-            // Updated Colors based on User Request
-            const colors = {
-                1: '#1a53ff', // Blue
-                2: '#2c1a0e', // Dark Brown/Black
-                3: '#eabb99', // Skin
-                4: '#ffffff', // White
-                5: '#FFD700', // Yellow
-                6: '#8B4513'  // Brown belt
-            };
+        draw(ctx) {
+            this.angle += 0.1;
+            const floatY = Math.sin(this.angle) * 5;
             
-            let sprite = PLAYER_IDLE;
+            ctx.save();
+            ctx.translate(this.x + 16, this.y + 16 + floatY);
             
-            // Simple animation
-            if (this.speed !== 0) {
-                this.frameTimer++;
-                if (this.frameTimer > this.frameInterval) {
-                   this.frameX = (this.frameX === 0) ? 1 : 0;
-                   this.frameTimer = 0;
-                }
-                
-                if (this.frameX === 1) sprite = PLAYER_RUN;
-                else sprite = PLAYER_IDLE;
-                
-            } else {
-                sprite = PLAYER_IDLE;
-                this.frameX = 0;
-            }
-
-            drawSprite(context, sprite, this.x, this.y, SPRITE_SCALE, colors, this.direction === -1);
-        }
-
-        update(input, platforms) {
-            // Horizontal Movement
-            if (input.keys.includes('ArrowRight') || input.keys.includes('d')) {
-                this.speed = this.maxSpeed;
-                this.direction = 1;
-            } else if (input.keys.includes('ArrowLeft') || input.keys.includes('a')) {
-                this.speed = -this.maxSpeed;
-                this.direction = -1;
-            } else {
-                this.speed = 0;
-            }
+            // Draw Lightning Icon
+            ctx.fillStyle = '#FFFF00'; // Yellow
+            ctx.strokeStyle = '#FFA500'; // Orange
+            ctx.lineWidth = 2;
             
-            this.x += this.speed;
-
-            // Boundaries
-            if (this.x < 0) this.x = 0;
-
-            // Vertical Movement (Jumping)
-            if ((input.keys.includes('ArrowUp') || input.keys.includes('w') || input.keys.includes(' ')) && this.onGround(platforms)) {
-                this.vy -= this.jumpPower;
-                playSound('jump');
-            }
-
-            // Apply Gravity
-            this.y += this.vy;
+            ctx.beginPath();
+            ctx.moveTo(5, -10);
+            ctx.lineTo(-5, 5);
+            ctx.lineTo(0, 5);
+            ctx.lineTo(-5, 15);
+            ctx.lineTo(5, 0);
+            ctx.lineTo(0, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
             
-            // Collision detection with platforms (Vertical)
-            let onPlatform = false;
-            // Floor fallback
-            if (this.y < this.gameHeight - this.height) {
-                this.vy += this.weight;
-            } else {
-                this.vy = 0;
-                this.y = this.gameHeight - this.height;
-                onPlatform = true;
-            }
-
-            // Platform Collisions
-            platforms.forEach(platform => {
-                if (this.y + this.height <= platform.y && 
-                    this.y + this.height + this.vy >= platform.y &&
-                    this.x + this.width > platform.x && 
-                    this.x < platform.x + platform.width) {
-                        this.vy = 0;
-                        this.y = platform.y - this.height;
-                        onPlatform = true;
-                }
-            });
-        }
-
-        onGround(platforms) {
-            if (this.y >= this.gameHeight - this.height) return true;
-             for (let platform of platforms) {
-                if (this.y + this.height === platform.y &&
-                    this.x + this.width > platform.x &&
-                    this.x < platform.x + platform.width) {
-                    return true;
-                }
-            }
-            return false;
+            // Glow
+            ctx.shadowColor = '#FFFF00';
+            ctx.shadowBlur = 10;
+            ctx.stroke(); // Re-stroke for glow
+            
+            ctx.restore();
         }
     }
 
     class Enemy {
-        constructor(x, y) {
+        constructor(x, y, type) {
             this.x = x;
             this.y = y;
             this.width = 48; // 12 * 4
             this.height = 48;
-            this.speed = Math.random() * 2 + 1;
+            this.type = type; // 'orc', 'snail', 'plant'
+            this.speed = (type === 'snail') ? 1 : 2;
             this.direction = -1; 
             this.markedForDeletion = false;
+            if (type === 'plant') this.speed = 0;
         }
 
         update(platforms) {
-            this.x += this.speed * this.direction;
-            
-            // Simple bounce
-             if (!this.startX) this.startX = this.x;
-             if (this.x > this.startX + 100 || this.x < this.startX - 100) this.direction *= -1;
+            if (this.type !== 'plant') {
+                this.x += this.speed * this.direction;
+                // Simple bounce bounds
+                if (!this.startX) this.startX = this.x;
+                if (this.x > this.startX + 100 || this.x < this.startX - 100) this.direction *= -1;
+            }
         }
 
         draw(context) {
-            // Colors: 1=Green Skin, 2=Grey Armor, 3=Black/Shadow, 4=Horns/Teeth(White), 5=Belt(Red/Brown)
-            const colors = {
-                1: '#4CAF50', // Green Skin
-                2: '#808080', // Grey Armor
-                3: '#000000', // Eyes/Dark
-                4: '#F5F5DC', // Beige/Horn
-                5: '#8B0000'  // Dark Red belt
-            };
-            drawSprite(context, ENEMY_WALK, this.x, this.y, SPRITE_SCALE, colors, false);
+            let sprite = ENEMY_ORC;
+            let colors = {};
+            
+            if (this.type === 'orc') {
+                colors = { 1: '#4CAF50', 2: '#808080', 3: '#000000', 4: '#F5F5DC', 5: '#8B0000' };
+                sprite = ENEMY_ORC;
+            } else if (this.type === 'snail') {
+                colors = { 1: '#FF5722', 2: '#000000', 3: '#CDB38B', 4: '#FFCCBC' }; // Shell(Orange), Body(Tan)
+                sprite = ENEMY_SNAIL;
+            } else if (this.type === 'plant') {
+                colors = { 1: '#F44336', 2: '#4CAF50', 3: '#2E7D32', 4: '#FFFFFF' }; // Head(Red), Stem(Green)
+                sprite = ENEMY_PLANT;
+            }
+            
+            drawSprite(context, sprite, this.x, this.y, SPRITE_SCALE, colors, this.direction === 1); // Flip logic
         }
     }
 
@@ -449,10 +417,8 @@ window.addEventListener('load', function() {
         }
 
         draw(context) {
-            // Pulsing effect
             this.frameTimer++;
             const scale = 1 + Math.sin(this.frameTimer * 0.1) * 0.1;
-            
             const cx = this.x + this.width/2;
             const cy = this.y + this.height/2;
 
@@ -460,12 +426,12 @@ window.addEventListener('load', function() {
             context.translate(cx, cy);
             context.scale(scale, 1);
             
-            context.fillStyle = '#FFD700'; // Gold
+            context.fillStyle = '#FFD700'; 
             context.beginPath();
             context.ellipse(0, 0, this.width/2, this.height/2, 0, 0, Math.PI * 2);
             context.fill();
             
-            context.fillStyle = '#FFA500'; // Inner Shine
+            context.fillStyle = '#FFA500'; 
             context.beginPath();
             context.ellipse(0, 0, this.width/4, this.height/2 - 4, 0, 0, Math.PI * 2);
             context.fill();
@@ -473,131 +439,260 @@ window.addEventListener('load', function() {
             context.strokeStyle = 'black';
             context.lineWidth = 2;
             context.stroke();
-
             context.restore();
         }
     }
 
-    // Level Generation
+    class Player {
+        constructor(gameWidth, gameHeight) {
+            this.gameWidth = gameWidth;
+            this.gameHeight = gameHeight;
+            this.width = 44; 
+            this.height = 64; 
+            this.x = 100;
+            this.y = 300;
+            this.speed = 0;
+            this.vy = 0;
+            this.weight = 1; 
+            this.jumpPower = 20; 
+            this.baseSpeed = 7;
+            this.maxSpeed = 7;
+            this.direction = 1; 
+            this.frameTimer = 0;
+            this.frameInterval = 10; 
+            this.frameX = 0; 
+        }
+
+        draw(context) {
+            const colors = {
+                1: '#1a53ff', 2: '#2c1a0e', 3: '#eabb99', 4: '#ffffff', 5: '#FFD700', 6: '#8B4513'
+            };
+            
+            let sprite = PLAYER_IDLE;
+            
+            if (this.speed !== 0) {
+                this.frameTimer++;
+                if (this.frameTimer > this.frameInterval) {
+                   this.frameX = (this.frameX === 0) ? 1 : 0;
+                   this.frameTimer = 0;
+                }
+                if (this.frameX === 1) sprite = PLAYER_RUN;
+                else sprite = PLAYER_IDLE;
+            } else {
+                sprite = PLAYER_IDLE;
+                this.frameX = 0;
+            }
+
+            // Invincibility Flash
+            if (isInvcible) {
+                 if (Math.floor(Date.now() / 100) % 2 === 0) return; // Flash effect
+            }
+
+            drawSprite(context, sprite, this.x, this.y, SPRITE_SCALE, colors, this.direction === -1);
+        }
+
+        update(input, platforms) {
+            // Speed Boost Logic
+            if (speedBoost) {
+                this.maxSpeed = 12; // Fast!
+                this.frameInterval = 5; // Faster animation
+            } else {
+                this.maxSpeed = this.baseSpeed;
+                this.frameInterval = 10;
+            }
+
+            if (input.keys.includes('ArrowRight') || input.keys.includes('d')) {
+                this.speed = this.maxSpeed;
+                this.direction = 1;
+            } else if (input.keys.includes('ArrowLeft') || input.keys.includes('a')) {
+                this.speed = -this.maxSpeed;
+                this.direction = -1;
+            } else {
+                this.speed = 0;
+            }
+            
+            this.x += this.speed;
+            if (this.x < 0) this.x = 0;
+
+            if ((input.keys.includes('ArrowUp') || input.keys.includes('w') || input.keys.includes(' ')) && this.onGround(platforms)) {
+                this.vy -= this.jumpPower;
+                playSound('jump');
+            }
+
+            this.y += this.vy;
+            
+            let onPlatform = false;
+            // Jungle Floor (Deep pit death)
+            if (this.y > this.gameHeight + 100) {
+                // Fell in pit
+            } else {
+                this.vy += this.weight;
+            }
+
+            platforms.forEach(platform => {
+                if (this.y + this.height <= platform.y && 
+                    this.y + this.height + this.vy >= platform.y &&
+                    this.x + this.width > platform.x && 
+                    this.x < platform.x + platform.width) {
+                        this.vy = 0;
+                        this.y = platform.y - this.height;
+                        onPlatform = true;
+                }
+            });
+        }
+
+        onGround(platforms) {
+             for (let platform of platforms) {
+                if (this.y + this.height === platform.y &&
+                    this.x + this.width > platform.x &&
+                    this.x < platform.x + platform.width) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    // --- LEVEL GENERATION ---
     let platforms = [];
     let enemies = [];
     let coins = [];
     let decorations = [];
+    let powerups = [];
     let victoryRect = {};
-    let lives = 3;
     
-    function createLevel() {
+    function createJungleLevel() {
         platforms = [];
         enemies = [];
         coins = [];
         decorations = [];
+        powerups = [];
         
-        // Ground floor (Tiled grass)
-        platforms.push(new Platform(0, canvas.height - 40, 3000, 40)); 
+        const LEVEL_LENGTH = 15000;
         
-        // Background Scenery
-        for(let i=0; i<3000; i+= Math.random() * 300 + 100) {
-            decorations.push(new Decoration(i, canvas.height - 40, 'hill'));
-            decorations.push(new Decoration(i + 150, canvas.height - 40, 'bush'));
+        // Background - Parallax Layers equivalent
+        for(let i=0; i<LEVEL_LENGTH; i+= Math.random() * 800 + 400) {
+            decorations.push(new Decoration(i, canvas.height - 250, 'ruins')); // Ruins in BG
         }
-        for(let i=0; i<3000; i+= Math.random() * 400 + 200) {
-            decorations.push(new Decoration(i, Math.random() * 200 + 50, 'cloud'));
+        for(let i=0; i<LEVEL_LENGTH; i+= Math.random() * 200 + 100) {
+            decorations.push(new Decoration(i, canvas.height - 100, 'tree'));
+            if(Math.random() > 0.5) decorations.push(new Decoration(i+50, canvas.height - 40, 'bush'));
+        }
+        for(let i=0; i<LEVEL_LENGTH; i+= Math.random() * 400 + 200) {
+            decorations.push(new Decoration(i, Math.random() * 150 + 20, 'cloud'));
+        }
+        // Waterfalls
+        for(let i=1000; i<LEVEL_LENGTH; i+= 4000) {
+           decorations.push(new Decoration(i, 100, 'waterfall'));
         }
 
-        // Platforms & Obstacles
-        const platformData = [
-            {x: 400, y: 350, w: 200},
-            {x: 700, y: 220, w: 200},
-            {x: 1000, y: 350, w: 120},
-            {x: 1300, y: 200, w: 160},
-            {x: 1600, y: 350, w: 200},
-            {x: 2000, y: 250, w: 200},
-            {x: 2300, y: 350, w: 120}
-        ];
-
-        // Pipes
-        decorations.push(new Decoration(600, canvas.height - 40 - 80, 'pipe'));
-        decorations.push(new Decoration(1800, canvas.height - 40 - 80, 'pipe'));
-
-        platformData.forEach(p => {
-            platforms.push(new Platform(p.x, p.y, p.w, 40, 'brick')); // Use generic block height
-            // Coins
-            if (Math.random() > 0.3) coins.push(new Coin(p.x + p.w/2 - 15, p.y - 45));
-            // Enemies
-            if (Math.random() > 0.4) {
-                let enemy = new Enemy(p.x + 20, p.y - 48);
-                enemy.minX = p.x;
-                enemy.maxX = p.x + p.w - 48;
-                enemies.push(enemy);
+        // Procedural Terrain
+        let currentX = 0;
+        let groundY = canvas.height - 40;
+        
+        while(currentX < LEVEL_LENGTH) {
+            // Gap?
+            if (currentX > 500 && Math.random() < 0.2) {
+                currentX += Math.random() * 150 + 100; // Pit
             }
-        });
+            
+            // Platform Length
+            let pWidth = Math.random() * 800 + 400;
+            
+            // Floor
+            platforms.push(new Platform(currentX, groundY, pWidth, 40, 'jungle'));
+            
+            // High Platforms above
+            if (Math.random() < 0.7) {
+                let hY = groundY - (Math.random() * 150 + 100);
+                let hW = Math.random() * 300 + 100;
+                let hX = currentX + Math.random() * (pWidth - hW);
+                platforms.push(new Platform(hX, hY, hW, 40, 'stone'));
+                
+                // Enemies/Coins on High Platform
+                if (Math.random() > 0.3) coins.push(new Coin(hX + hW/2, hY - 40));
+                
+                // PowerUp Chance
+                if (Math.random() < 0.1) powerups.push(new PowerUp(hX + hW/2, hY - 50));
+            }
+            
+            // Enemies on ground
+            let enemyCount = Math.floor(pWidth / 300);
+            for(let e=0; e<enemyCount; e++) {
+                let ex = currentX + Math.random() * pWidth;
+                let typeRand = Math.random();
+                let type = 'orc';
+                if (typeRand < 0.3) type = 'snail';
+                else if (typeRand < 0.5) type = 'plant';
+                
+                enemies.push(new Enemy(ex, groundY - 48, type));
+            }
 
-        // Ground Enemies
-        enemies.push(new Enemy(900, canvas.height - 40 - 48));
+            currentX += pWidth;
+        }
 
-        // Victory Condition
-        victoryRect = {x: 2800, y: canvas.height - 190, w: 10, h: 150};
+        victoryRect = {x: LEVEL_LENGTH - 200, y: groundY - 150, w: 10, h: 150};
     }
 
-    createLevel();
+    createJungleLevel();
 
     const input = new InputHandler();
     let player = new Player(canvas.width, canvas.height); 
-
+    
+    // UI Helpers
     function updateLivesDisplay() {
         const livesContainer = document.getElementById('lives');
         let hearts = '';
-        for(let i=0; i<lives; i++) {
-            hearts += '❤️';
-        }
+        for(let i=0; i<lives; i++) hearts += '❤️';
         livesContainer.innerText = 'Lives: ' + hearts;
     }
 
-    function handleEnemies(deltaTime) {
+    function checkCollisions(deltaTime) {
+        // ENEMIES
         enemies.forEach(enemy => {
             enemy.update();
             enemy.draw(ctx);
 
-            if (
-                player.x < enemy.x + enemy.width &&
-                player.x + player.width > enemy.x &&
-                player.y < enemy.y + enemy.height &&
-                player.y + player.height > enemy.y
-            ) {
-                // Kill enemy
-                if (player.vy > 0 && player.y + player.height - player.vy <= enemy.y + enemy.height * 0.7) {
+            if (player.x < enemy.x + enemy.width && player.x + player.width > enemy.x &&
+                player.y < enemy.y + enemy.height && player.y + player.height > enemy.y) {
+                
+                // Jump Kill (Orc/Snail only, Plants hurt always)
+                if (enemy.type !== 'plant' && player.vy > 0 && player.y + player.height - player.vy <= enemy.y + enemy.height * 0.7) {
                     enemy.markedForDeletion = true;
                     player.vy = -12; 
                     score += 50;
                     playSound('hit');
                     document.getElementById('score').innerText = 'Score: ' + score;
                 } else {
-                    lives--;
-                    playSound('hit');
-                    updateLivesDisplay();
-                    player.x = 100; player.y = canvas.height - 150;
-                    
-                    if (lives <= 0) {
-                        gameOver = true;
-                        playSound('gameover');
-                        document.getElementById('game-over').querySelector('h1').innerText = "GAME OVER";
-                        document.getElementById('game-over').classList.remove('hidden');
+                    if (!isInvcible) {
+                        lives--;
+                        playSound('hit');
+                        updateLivesDisplay();
+                        player.x = Math.max(0, player.x - 100); 
+                        player.y = canvas.height - 200;
+                        player.vy = 0;
+                        
+                        if (lives <= 0) {
+                            gameOver = true;
+                            playSound('gameover');
+                            document.getElementById('game-over').querySelector('h1').innerText = "GAME OVER";
+                            document.getElementById('game-over').classList.remove('hidden');
+                        } else {
+                            // Temp invincibility after hit
+                            isInvcible = true;
+                            setTimeout(() => { isInvcible = false; }, 1000);
+                        }
                     }
                 }
             }
         });
         enemies = enemies.filter(enemy => !enemy.markedForDeletion);
-    }
-
-    function handleCoins() {
+        
+        // COINS
         coins.forEach(coin => {
             coin.draw(ctx);
-             if (
-                player.x < coin.x + coin.width &&
-                player.x + player.width > coin.x &&
-                player.y < coin.y + coin.height &&
-                player.y + player.height > coin.y
-            ) {
+             if (player.x < coin.x + coin.width && player.x + player.width > coin.x &&
+                player.y < coin.y + coin.height && player.y + player.height > coin.y) {
                 coin.markedForDeletion = true;
                 score += 10;
                 playSound('coin');
@@ -605,17 +700,38 @@ window.addEventListener('load', function() {
             }
         });
         coins = coins.filter(coin => !coin.markedForDeletion);
+        
+        // POWERUPS
+        powerups.forEach(p => {
+            p.draw(ctx);
+             if (player.x < p.x + p.width && player.x + player.width > p.x &&
+                player.y < p.y + p.height && player.y + player.height > p.y) {
+                p.markedForDeletion = true;
+                playSound('powerup');
+                activatePowerUp();
+            }
+        });
+        powerups = powerups.filter(p => !p.markedForDeletion);
+    }
+    
+    function activatePowerUp() {
+        speedBoost = true;
+        isInvcible = true;
+        setTimeout(() => {
+            speedBoost = false;
+            isInvcible = false;
+        }, 10000); // 10s duration
     }
 
     function animate(timeStamp) {
         const deltaTime = timeStamp - lastTime;
         lastTime = timeStamp;
 
-        if (!gameOver) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!gameOver && !gameWon) ctx.clearRect(0, 0, canvas.width, canvas.height);
         else return;
         
-        // Sky Color
-        ctx.fillStyle = '#6B8CFF'; // Mario Sky Blue
+        // Jungle Sky
+        ctx.fillStyle = '#26C6DA'; // Tropical Cyan/Blue
         ctx.fillRect(0,0, canvas.width, canvas.height);
 
         let cameraX = 0;
@@ -626,71 +742,67 @@ window.addEventListener('load', function() {
         ctx.save();
         ctx.translate(-cameraX, 0);
 
-        // Draw Scenery (Behind platforms)
-        decorations.forEach(dec => dec.draw(ctx));
+        decorations.forEach(dec => dec.draw(ctx)); // BG
+        platforms.forEach(platform => platform.draw(ctx)); // Ground
 
-        // Draw Platforms
-        platforms.forEach(platform => platform.draw(ctx));
-
-        // Draw Victory Goal
-        ctx.fillStyle = '#B8860B'; // Pole
+        // Goal
+        ctx.fillStyle = '#B8860B'; 
         ctx.fillRect(victoryRect.x, victoryRect.y, victoryRect.w, victoryRect.h);
-        ctx.beginPath(); // Flag
+        ctx.beginPath(); 
         ctx.moveTo(victoryRect.x + victoryRect.w, victoryRect.y);
         ctx.lineTo(victoryRect.x + 50, victoryRect.y + 20);
         ctx.lineTo(victoryRect.x + victoryRect.w, victoryRect.y + 40);
         ctx.fillStyle = 'red';
         ctx.fill();
 
-        handleEnemies(deltaTime);
-        handleCoins();
+        checkCollisions(deltaTime);
 
         player.draw(ctx);
         player.update(input, platforms); 
 
-        // Check Victory
+        // Victory
         if (player.x > victoryRect.x) {
-            gameOver = true;
+            gameWon = true;
             playSound('coin');
-            document.getElementById('game-over').querySelector('h1').innerText = "YOU WIN!";
+            document.getElementById('game-over').querySelector('h1').innerText = "JUNGLE CONQUERED!";
             document.getElementById('game-over').classList.remove('hidden');
         }
 
-        // Check if fell off world
-        if (player.y > canvas.height) {
+        // Death Pit
+        if (player.y > canvas.height + 200) {
             lives--;
             playSound('hit');
             updateLivesDisplay();
-            player.x = 100; player.y = canvas.height - 150;
+            player.x = Math.max(0, player.x - 200); // Respawn back a bit
+            player.y = 100; // Drop from sky
             player.vy = 0;
             if (lives <= 0) {
                 gameOver = true;
                 playSound('gameover');
                 document.getElementById('game-over').querySelector('h1').innerText = "GAME OVER";
                 document.getElementById('game-over').classList.remove('hidden');
-            } else {
-                
             }
         }
 
         ctx.restore();
 
-        if (!gameOver) requestAnimationFrame(animate); 
+        if (!gameOver && !gameWon) requestAnimationFrame(animate); 
     }
     
     function restartGame() {
         gameOver = false;
+        gameWon = false;
         score = 0;
         lives = 3;
         document.getElementById('score').innerText = 'Score: 0';
         updateLivesDisplay();
         document.getElementById('game-over').classList.add('hidden');
         player = new Player(canvas.width, canvas.height);
-        createLevel(); 
+        createJungleLevel(); 
         lastTime = performance.now();
         animate(lastTime);
     }
     
-    updateLivesDisplay(); // Init
+    updateLivesDisplay();
     animate(0);
 });
